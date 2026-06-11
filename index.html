@@ -2,12 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-<title>inkwash ii</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#f1efe8">
+<title>inkwash</title>
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #f1efe8; }
   body { font-family: "Helvetica Neue", Helvetica, system-ui, sans-serif;
-         -webkit-user-select: none; user-select: none; }
+         -webkit-user-select: none; user-select: none;
+         -webkit-touch-callout: none; overscroll-behavior: none; }
   canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; cursor: none; touch-action: none; }
 
   #cursor { position: fixed; left: 0; top: 0; width: 10px; height: 10px;
@@ -50,6 +54,18 @@
   #ui button.mode { color: rgba(38,38,48,.7); min-width: 52px; }
   .err { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
          font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: rgba(38,38,48,.5); }
+
+  /* touch devices: controls always visible, finger-sized, above the home indicator */
+  body.touch #ui { opacity: 1; pointer-events: auto;
+        flex-wrap: wrap; justify-content: center; align-items: flex-end;
+        gap: 10px 20px; max-width: 94vw; padding: 10px 16px; border-radius: 16px;
+        background: rgba(241,239,232,.6);
+        -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+        bottom: calc(10px + env(safe-area-inset-bottom)); }
+  body.touch input[type=range] { width: 70px; height: 28px; }
+  body.touch input[type=range]::-webkit-slider-thumb { width: 15px; height: 15px; margin-top: -7px; }
+  body.touch #ui button { font-size: 10.5px; padding: 8px 4px 5px; }
+  body.touch .ctl { gap: 4px; }
 </style>
 </head>
 <body>
@@ -94,12 +110,20 @@ if (!gl) { document.body.innerHTML = '<div class="err">webgl2 unavailable</div>'
 gl.getExtension('EXT_color_buffer_float');
 gl.disable(gl.BLEND);
 
+const TOUCH = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 1;
+if (TOUCH){
+  document.body.classList.add('touch');
+  uiEl.classList.add('show');
+  hintEl.innerHTML = 'draw<br>with a pencil, your finger becomes the water brush';
+}
+
 /* ---------------- parameters ---------------- */
 
 const P = { SIZE: 0.5, FLOW: 0.6, BLEED: 0.5, DRY: 0.45, COLOR: 0.5, BINK: 0.0 };
 
 const SIM_BASE = DEMO ? 192 : 256;       // velocity / pressure grid
-const DYE_BASE = DEMO ? 1024 : 2048;     // pigment + wetness grid
+// pigment + wetness grid: match the screen, never exceed it (portrait phones included)
+const DYE_BASE = DEMO ? 1024 : Math.min(2048, Math.min(canvas.width, canvas.height));
 const PRESSURE_ITER = 22;
 
 const INK_ABS = [1.00, 0.97, 0.88];      // near-black ink, faintly cool
@@ -484,8 +508,10 @@ const ptr = {
   speed: 0, simP: 0.35,
   force: 0, hasForce: false, forceT: 0,
   cx: 0, cy: 0, inWindow: false,
-  barrel: false,
+  barrel: false, type: 'mouse',
 };
+let activePointerId = null;
+let pencilSeen = false;
 let uiMode = 'pen';
 let inkWhite = false;
 let demoMode = null;            // demo override: 'pen' | 'brush' | null
@@ -497,6 +523,7 @@ function fixDrawing(){ fixTimer = 1.2; }
 
 function activeMode(){
   if (demoMode) return demoMode;
+  if (ptr.type === 'touch' && pencilSeen) return 'brush';   // pencil draws, finger is water
   if (ptr.barrel) return uiMode === 'pen' ? 'brush' : 'pen';
   return uiMode;
 }
@@ -505,24 +532,34 @@ function toUv(e){ return [e.clientX / innerWidth, 1 - e.clientY / innerHeight]; 
 
 canvas.addEventListener('pointerdown', e => {
   e.preventDefault();
+  if (ptr.down && e.pointerId !== activePointerId) return;   // one stroke at a time
+  activePointerId = e.pointerId;
   canvas.setPointerCapture(e.pointerId);
+  if (e.pointerType === 'pen') pencilSeen = true;
   const [x, y] = toUv(e);
   ptr.down = true; ptr.tx = x; ptr.ty = y; ptr.bx = x; ptr.by = y;
   ptr.speed = 0; ptr.simP = 0.35;
+  ptr.type = e.pointerType;
   ptr.barrel = (e.buttons & 34) !== 0;     // barrel button (2) or eraser (32)
   readPressure(e);
   if (strokes++ === 0) hintEl.classList.add('gone');
 });
 canvas.addEventListener('pointermove', e => {
+  if (ptr.down && e.pointerId !== activePointerId) return;   // ignore palm / second finger
+  if (e.pointerType === 'pen') pencilSeen = true;
   const [x, y] = toUv(e);
   ptr.tx = x; ptr.ty = y;
   ptr.cx = e.clientX; ptr.cy = e.clientY;
   ptr.inWindow = true;
+  if (!ptr.down) ptr.type = e.pointerType;
   if (ptr.down) ptr.barrel = (e.buttons & 34) !== 0;
   readPressure(e);
-  if (!ptr.down) uiEl.classList.toggle('show', e.clientY > innerHeight - 110);
+  if (!ptr.down && !TOUCH) uiEl.classList.toggle('show', e.clientY > innerHeight - 110);
 });
-function endStroke(){ ptr.down = false; ptr.barrel = false; }
+function endStroke(e){
+  if (e && e.pointerId !== undefined && e.pointerId !== activePointerId) return;
+  ptr.down = false; ptr.barrel = false; activePointerId = null;
+}
 canvas.addEventListener('pointerup', endStroke);
 canvas.addEventListener('pointercancel', endStroke);
 window.addEventListener('blur', endStroke);
@@ -531,6 +568,7 @@ canvas.addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('gesturestart', e => e.preventDefault());
 
 function readPressure(e){
+  if (e.pointerType === 'touch') return;   // finger "pressure" is unreliable; speed sim instead
   if (e.pointerType === 'pen' || (e.pressure > 0 && Math.abs(e.pressure - 0.5) > 0.001)){
     ptr.force = e.pressure; ptr.hasForce = true; ptr.forceT = performance.now();
   }
@@ -543,6 +581,7 @@ canvas.addEventListener('webkitmouseforcechanged', e => {
 });
 
 function pressureNow(){
+  if (ptr.type === 'touch') return ptr.simP;
   if (ptr.hasForce && performance.now() - ptr.forceT < 3000) return ptr.force;
   return ptr.simP;
 }
@@ -817,6 +856,7 @@ if (DEMO){
 }
 
 function updateCursor(){
+  if (ptr.type === 'touch'){ cursorEl.style.opacity = 0; return; }   // ring under a finger is noise
   if (!ptr.inWindow && !ptr.down){ cursorEl.style.opacity = 0; return; }
   cursorEl.style.opacity = 1;
   const mode = activeMode();

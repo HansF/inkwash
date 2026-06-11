@@ -10,6 +10,9 @@ The **pen** lays down dark ink; pressure and speed shape the line. The **brush**
 (hold the pen's barrel button, or press `b`) lays down water instead — ink flows,
 bleeds and blends only where the paper is wet, then gradually dries in place.
 
+On iPad, the Apple Pencil draws and **your finger is the water brush**.
+Works on phones and tablets without a stylus too — the controls stay on screen.
+
 Keys: `b` pen/brush · `w` white ink · `d` fix the drawing into the paper ·
 `f` fullscreen · `c` clear · `s` save PNG. Sliders appear at the bottom edge.
 
