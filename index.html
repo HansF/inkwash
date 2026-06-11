@@ -370,7 +370,10 @@ void main(){
     vec2 d = vUv - uBrush.xy; d.x *= uAspect;
     brush = exp(-dot(d,d) / (uBrush.z * uBrush.z));
   }
-  float lift = clamp(w * (0.04 + 0.35 * brush) * uDt, 0., 0.25);
+  // re-wetting lift disabled: it haloed fresh strokes drawn over fixed work and
+  // desaturated multi-layer paintings. Restore the line below to bring it back.
+  // float lift = clamp(w * (0.04 + 0.35 * brush) * uDt, 0., 0.25);
+  float lift = 0.0;
   if (uMode < 0.5){
     vec3 fd = F.rgb * (1.0 - lift) + M.rgb * uSettle;
     float fw = F.a * (1.0 - lift) + M.a * uSettle;
