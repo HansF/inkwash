@@ -6,7 +6,7 @@ Pen-and-ink with living water — a fluid-simulation drawing app in a single HTM
 
 **Draw: <https://johnowhitaker.github.io/inkwash/>**
 
-**About (WIP)**<https://johnowhitaker.github.io/inkwash/about>**
+**About (WIP) <https://johnowhitaker.github.io/inkwash/about>**
 
 Demo video of a quick sketch [here](https://x.com/johnowhitaker/status/2065118226879811737?s=20) (Thread contains more examples)
 
