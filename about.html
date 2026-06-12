@@ -165,14 +165,13 @@
   <p class="standfirst">A watercolor simulator in one HTML file — the inspiration,
   the fluid dynamics, and the rendering tricks behind
   <a href="index.html">inkwash</a>, with live demos throughout.</p>
-  <p class="byline">Every figure on this page is the real engine, running in miniature.
-  <em>When a demo is painting, you can take over — touch the canvas and it&rsquo;s yours.</em></p>
+  <p class="byline">Every figure on this page is the real engine, running in miniature.</p>
 
   <figure class="fig wide" style="margin-left:0;margin-right:0;">
     <div class="demo" data-demo="hero"><canvas></canvas><div class="bar"></div></div>
-    <figcaption><span class="fno">fig 1</span>The whole loop, on repeat: pen lines are
-    drawn and fixed into the paper, then a water brush pulls washes — and hidden color —
-    out of them. Draw on it whenever you like; <em>replay</em> hands it back to the script.</figcaption>
+    <figcaption><span class="fno">fig 1</span>The whole loop, on repeat: pen lines, then
+    a lightly loaded water brush pulling washes — and hidden color — out of them.
+    Draw on it whenever you like; <em>replay</em> hands it back to the script.</figcaption>
   </figure>
 </header>
 
@@ -197,6 +196,12 @@ mark never moves again. The brush is weather: it doesn&rsquo;t so much add paint
 <em>release</em> what&rsquo;s already on the page, softening edges, pooling in valleys,
 drying with a darker rim. Half of the craft is knowing when to stop steering and let
 the water finish the sentence.</p>
+
+<figure class="fig">
+  <img src="images/sketches.png" alt="Pen and watercolor sketches: a robot with washes of violet and blue, and pen studies of flamingos and an emu"
+       style="display:block; width:100%; border:1px solid var(--ink-16); border-radius:2px;">
+  <figcaption>Example sketches from my notebooks.</figcaption>
+</figure>
 
 <p>Inkwash is an attempt to put that asymmetry in a browser. It makes one slightly
 unusual design decision, and almost everything else on this page follows from it:</p>
@@ -566,10 +571,10 @@ of the physics:</p>
   </div>
   <div class="bar" data-bar="gallery"></div>
   <figcaption><span class="fno">fig 13</span>Three idioms, looping. <em>Left:</em> the
-  journaling classic — fix the linework, then wash inside it for blue-haloed shading.
-  <em>Middle:</em> wet the paper first with a clean brush, then touch the pen into the
-  puddle and let it bloom. <em>Right:</em> fix a dark field, then white ink becomes
-  stars.</figcaption>
+  journaling classic — linework, then a wash inside it that feathers the fresh lines
+  into blue-haloed shading. <em>Middle:</em> wet the paper first with a clean brush,
+  then touch the pen into the puddle and let it bloom. <em>Right:</em> fix a dark
+  field, then white ink becomes stars.</figcaption>
 </figure>
 
 <p><strong>Line, then wash</strong> is the native idiom: draw, press <kbd>d</kbd> to
@@ -634,7 +639,6 @@ this article.</p>
 (function(){
 
 const DEMO = /demo/.test(location.search);
-const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches && !DEMO;
 const dpr = Math.min(window.devicePixelRatio || 1, 2);
 const TAU = Math.PI * 2;
 const INK_ABS = [1.00, 0.97, 0.88];
@@ -990,12 +994,14 @@ class Sim {
     this.P = Object.assign({ SIZE:0.5, FLOW:0.6, BLEED:0.5, DRY:0.45, COLOR:0.5, BINK:0 }, cfg.P);
     this.dur = cfg.dur;
     this.script = cfg.script();
-    this.scriptOff = REDUCED;
+    this.scriptOff = false;
     this.t = 0;
     this.view = 0;
     this.fx = { paper:1, grain:1, edge:1, sheen:1, vig:1 };
     this.mode = 'pen'; this.white = false;          // script-driven
     this.userMode = 'pen'; this.userWhite = false;  // human-driven
+    this.inkAbs = INK_ABS;                          // scripts may tint the ink
+    this.baseBINK = this.P.BINK;
     this.visible = false;
     this.fixTimer = 0;
     this.brushNow = { x:0, y:0, r:0 };
@@ -1035,6 +1041,8 @@ class Sim {
     this.script.reset();
     this.scriptOff = false;
     this.ptr.down = false;
+    this.inkAbs = INK_ABS;
+    this.P.BINK = this.baseBINK;
   }
 
   attachInput(){
@@ -1052,6 +1060,8 @@ class Sim {
       e.preventDefault();
       cv.setPointerCapture(e.pointerId);
       this.scriptOff = true;
+      this.inkAbs = INK_ABS;            // humans get the house ink and brush load
+      this.P.BINK = this.baseBINK;
       const [x, y] = uv(e);
       p.down = true; p.tx = x; p.ty = y; p.bx = x; p.by = y;
       p.speed = 0; p.simP = 0.35;
@@ -1087,8 +1097,9 @@ class Sim {
   activeWhite(){ return this.scriptOff ? this.userWhite : this.white; }
 
   inkColor(dens){
+    const A = this.inkAbs;
     return this.activeWhite() ? [0, 0, 0, dens]
-                              : [INK_ABS[0]*dens, INK_ABS[1]*dens, INK_ABS[2]*dens, 0];
+                              : [A[0]*dens, A[1]*dens, A[2]*dens, 0];
   }
 
   splat(target, x, y, r, c, useMax){
@@ -1336,8 +1347,9 @@ class Sim {
 /* ============ scripted strokes ============ */
 
 /* a stroke script is a list of timed actions:
-   {t0,t1, path(s)->[x,y], pr, mode, white}  draws a stroke
-   {at, fn(sim)}                             fires once (fix, etc.)            */
+   {t0,t1, path(s)->[x,y], pr, mode, white, bink, abs}  draws a stroke
+     bink loads the brush with pigment for this stroke; abs tints the ink
+   {at, fn(sim)}                                        fires once (fix, etc.) */
 function play(defs){
   const acts = defs.map(d => Object.assign({}, d));
   const fn = (sim, t) => {
@@ -1359,6 +1371,8 @@ function play(defs){
         sim.ptr.down = true;
         sim.mode = a.mode || 'pen';
         sim.white = !!a.white;
+        sim.P.BINK = a.bink !== undefined ? a.bink : sim.baseBINK;
+        sim.inkAbs = a.abs || INK_ABS;
         sim.ptr.simP = a.pr === undefined ? 0.55 : (typeof a.pr === 'function' ? a.pr(s) : a.pr);
       } else {
         a.on = false;
@@ -1376,32 +1390,33 @@ const taper = s => 0.22 + 0.78 * Math.sin(Math.PI * Math.min(Math.max(s, 0), 1))
 const DEMOS = {
 
   hero: {
-    aspect: 1.85, dye: 600, dur: 18.5,
-    P: { COLOR: 0.6, BLEED: 0.55, DRY: 0.35 },
+    aspect: 1.85, dye: 600, dur: 19,
+    P: { COLOR: 1.0, BLEED: 0.55, DRY: 0.35 },
     bar: [{ modes: ['pen', 'water', 'white'] }, { fix: 1 }, { clear: 1 }, { replay: 1 }],
     script: () => play([
-      // linework: two hills, a horizon, a sun, two birds
+      // linework: two hills, a horizon, a sun, two birds — left unfixed,
+      // so the washes catch the lines and pull color out of them
       { t0: 0.2,  t1: 1.3,  path: s => [0.06 + 0.42*s, 0.30 + 0.30*Math.sin(Math.PI*s)], pr: taper },
       { t0: 1.5,  t1: 2.7,  path: s => [0.36 + 0.57*s, 0.30 + 0.21*Math.sin(Math.PI*s)], pr: taper },
       { t0: 2.9,  t1: 3.7,  path: s => [0.04 + 0.92*s, 0.295 + 0.006*Math.sin(s*9)], pr: 0.4 },
       { t0: 3.9,  t1: 4.8,  path: s => [0.80 + 0.038*Math.cos(TAU*s + 1.57), 0.74 + 0.07*Math.sin(TAU*s + 1.57)], pr: 0.5 },
       { t0: 5.0,  t1: 5.28, path: s => [0.26 + 0.055*s, 0.79 + 0.03*Math.abs(2*s - 1)], pr: 0.35 },
       { t0: 5.4,  t1: 5.62, path: s => [0.385 + 0.042*s, 0.84 + 0.024*Math.abs(2*s - 1)], pr: 0.3 },
-      { at: 6.1, fn: sim => sim.fix() },
-      // washes: hills, water, a halo around the sun
-      { t0: 6.6,  t1: 8.4,  mode: 'brush', pr: 0.55,
+      // washes: lightly loaded brush over the hills and water,
+      // a pigment-heavy yellow swirl around the sun
+      { t0: 6.4,  t1: 8.2,  mode: 'brush', pr: 0.55, bink: 0.35,
         path: s => [0.09 + 0.37*s, 0.33 + 0.17*Math.sin(Math.PI*s)*(0.55 + 0.45*Math.sin(s*16))] },
-      { t0: 8.6,  t1: 10.2, mode: 'brush', pr: 0.5,
+      { t0: 8.4,  t1: 10.0, mode: 'brush', pr: 0.5, bink: 0.35,
         path: s => [0.43 + 0.49*s, 0.32 + 0.12*Math.sin(Math.PI*s)*(0.6 + 0.4*Math.sin(s*14))] },
-      { t0: 10.5, t1: 11.8, mode: 'brush', pr: 0.7,
+      { t0: 10.3, t1: 11.6, mode: 'brush', pr: 0.7, bink: 0.25,
         path: s => [0.10 + 0.74*s, 0.205 + 0.03*Math.sin(s*11)] },
-      { t0: 12.0, t1: 12.9, mode: 'brush', pr: 0.45,
-        path: s => [0.80 + 0.05*Math.cos(TAU*1.5*s)/1.85, 0.74 + 0.05*Math.sin(TAU*1.5*s)] },
-      { at: 14.4, fn: sim => sim.fix() },
+      { t0: 11.9, t1: 13.4, mode: 'brush', pr: 0.5, bink: 0.9, abs: [0.04, 0.15, 1.0],
+        path: s => [0.80 + 0.062*Math.cos(TAU*2*s)/1.85, 0.74 + 0.062*Math.sin(TAU*2*s)] },
+      { at: 14.8, fn: sim => sim.fix() },
       // white sparkles on the water
-      { t0: 15.0, t1: 15.25, white: 1, path: s => [0.33 + 0.07*s, 0.225], pr: 0.5 },
-      { t0: 15.4, t1: 15.6,  white: 1, path: s => [0.52 + 0.05*s, 0.185], pr: 0.45 },
-      { t0: 15.75,t1: 15.95, white: 1, path: s => [0.68 + 0.045*s, 0.24], pr: 0.45 },
+      { t0: 15.3, t1: 15.55, white: 1, path: s => [0.33 + 0.07*s, 0.225], pr: 0.5 },
+      { t0: 15.7, t1: 15.9,  white: 1, path: s => [0.52 + 0.05*s, 0.185], pr: 0.45 },
+      { t0: 16.05,t1: 16.25, white: 1, path: s => [0.68 + 0.045*s, 0.24], pr: 0.45 },
     ]),
   },
 
@@ -1418,7 +1433,7 @@ const DEMOS = {
   flowlow: {
     aspect: 1.0, dur: 9, P: { FLOW: 0.08, BLEED: 0.45 }, dye: 420,
     script: () => play([
-      { t0: 0.2, t1: 1.1, path: s => [0.5 + 0.10*Math.cos(TAU*5*s), 0.5 + 0.10*Math.sin(TAU*7*s)], pr: 0.85 },
+      { t0: 0.2, t1: 1.2, path: s => [0.5, 0.18 + 0.64*s], pr: taper },
       { t0: 1.5, t1: 5.3, mode: 'brush', pr: 0.6,
         path: s => { const a = TAU*2*s - 1.57; return [0.5 + 0.26*Math.cos(a), 0.5 + 0.26*Math.sin(a)]; } },
     ]),
@@ -1427,7 +1442,7 @@ const DEMOS = {
   flowhigh: {
     aspect: 1.0, dur: 9, P: { FLOW: 0.95, BLEED: 0.45 }, dye: 420,
     script: () => play([
-      { t0: 0.2, t1: 1.1, path: s => [0.5 + 0.10*Math.cos(TAU*5*s), 0.5 + 0.10*Math.sin(TAU*7*s)], pr: 0.85 },
+      { t0: 0.2, t1: 1.2, path: s => [0.5, 0.18 + 0.64*s], pr: taper },
       { t0: 1.5, t1: 5.3, mode: 'brush', pr: 0.6,
         path: s => { const a = TAU*2*s - 1.57; return [0.5 + 0.26*Math.cos(a), 0.5 + 0.26*Math.sin(a)]; } },
     ]),
@@ -1454,13 +1469,13 @@ const DEMOS = {
   },
 
   bleed: {
-    aspect: 2.0, dur: 11, P: { BLEED: 0.55, COLOR: 0.6 },
+    aspect: 2.0, dur: 11, P: { BLEED: 1.0, COLOR: 1.0, SIZE: 0.65 },
     bar: [{ slider: 'BLEED', label: 'bleed' }, { slider: 'COLOR', label: 'color' },
           { modes: ['pen', 'water'] }, { replay: 1 }],
     script: () => play([
-      { t0: 0.2, t1: 1.0, path: s => [0.32 + 0.05*Math.cos(TAU*6*s)/2, 0.5 + 0.05*Math.sin(TAU*9*s)], pr: 0.9 },
-      { t0: 1.4, t1: 4.6, mode: 'brush', pr: 0.5,
-        path: s => { const a = TAU*2.6*s, r = 0.10 + 0.10*s; return [0.32 + r*Math.cos(a)/2, 0.5 + r*Math.sin(a)]; } },
+      { t0: 0.2, t1: 1.2, path: s => [0.32 + 0.075*Math.cos(TAU*6*s)/2, 0.5 + 0.075*Math.sin(TAU*9*s)], pr: 0.95 },
+      { t0: 1.6, t1: 4.8, mode: 'brush', pr: 0.5,
+        path: s => { const a = TAU*2.6*s, r = 0.13 + 0.12*s; return [0.32 + r*Math.cos(a)/2, 0.5 + r*Math.sin(a)]; } },
     ]),
   },
 
@@ -1517,41 +1532,49 @@ const DEMOS = {
       { t0: 0.2,  t1: 1.1,  path: s => [0.18 + 0.62*s, 0.50 + 0.26*Math.sin(Math.PI*s)], pr: taper },
       { t0: 1.25, t1: 2.15, path: s => [0.18 + 0.62*s, 0.50 - 0.26*Math.sin(Math.PI*s)], pr: taper },
       { t0: 2.3,  t1: 2.9,  path: s => [0.20 + 0.56*s, 0.50], pr: 0.4 },
-      { at: 3.4, fn: sim => sim.fix() },
       { t0: 3.9, t1: 5.6, mode: 'brush', pr: 0.5,
         path: s => [0.22 + 0.5*s, 0.5 + 0.17*Math.sin(Math.PI*s)*Math.sin(TAU*2.5*s)] },
     ]),
   },
 
   galbloom: {
-    aspect: 1.0, dur: 9, dye: 420,
+    aspect: 1.0, dur: 9.5, dye: 420,
     P: { DRY: 0.2, BLEED: 0.65, COLOR: 0.55 },
     script: () => play([
       { t0: 0.2, t1: 2.0, mode: 'brush', pr: 0.75,
         path: s => { const a = TAU*1.8*s, r = 0.30 - 0.12*s; return [0.5 + r*Math.cos(a), 0.5 + r*Math.sin(a)]; } },
-      { t0: 2.4,  t1: 2.85, path: () => [0.40, 0.58], pr: 0.85 },
-      { t0: 3.0,  t1: 3.4,  path: () => [0.58, 0.46], pr: 0.85 },
-      { t0: 3.55, t1: 3.9,  path: () => [0.47, 0.35], pr: 0.75 },
-      { t0: 4.05, t1: 4.4,  path: () => [0.60, 0.62], pr: 0.75 },
+      // a tighter inner circle so the puddle has no dry hole in the middle
+      { t0: 2.2, t1: 2.9, mode: 'brush', pr: 0.7,
+        path: s => { const a = TAU*s; return [0.5 + 0.10*Math.cos(a), 0.5 + 0.10*Math.sin(a)]; } },
+      { t0: 3.1,  t1: 3.55, path: () => [0.40, 0.58], pr: 0.85 },
+      { t0: 3.7,  t1: 4.1,  path: () => [0.58, 0.46], pr: 0.85 },
+      { t0: 4.25, t1: 4.6,  path: () => [0.47, 0.35], pr: 0.75 },
+      { t0: 4.75, t1: 5.1,  path: () => [0.60, 0.62], pr: 0.75 },
     ]),
   },
 
   galnight: {
-    aspect: 1.0, dur: 10, dye: 420,
-    P: { SIZE: 0.55, BINK: 1.0, DRY: 0.6, BLEED: 0.3, FLOW: 0.3 },
+    aspect: 1.0, dur: 14, dye: 420,
+    P: { SIZE: 0.6, BINK: 1.0, DRY: 0.6, BLEED: 0.3, FLOW: 0.25 },
     script: () => play([
-      // night sky: two loaded-brush sweeps across the top
-      { t0: 0.2, t1: 1.5, mode: 'brush', pr: 0.85,
-        path: s => [0.18 + 0.64*s, 0.74 + 0.04*Math.sin(TAU*s)] },
-      { t0: 1.7, t1: 3.0, mode: 'brush', pr: 0.85,
-        path: s => [0.18 + 0.64*s, 0.54 - 0.04*Math.sin(TAU*s)] },
-      { at: 3.5, fn: sim => sim.fix() },
-      { t0: 4.0,  t1: 4.3,  white: 1, path: () => [0.30, 0.78], pr: 0.6 },
-      { t0: 4.45, t1: 4.7,  white: 1, path: () => [0.52, 0.84], pr: 0.55 },
-      { t0: 4.85, t1: 5.1,  white: 1, path: () => [0.74, 0.70], pr: 0.6 },
-      { t0: 5.25, t1: 5.5,  white: 1, path: () => [0.40, 0.60], pr: 0.5 },
-      { t0: 5.7,  t1: 6.6,  white: 1, pr: 0.85,
-        path: s => [0.63 + 0.05*Math.cos(TAU*0.7*s + 2.2), 0.72 + 0.06*Math.sin(TAU*0.7*s + 2.2)] },
+      // night sky: five slow, heavily loaded passes — two coats — for real darkness
+      { t0: 0.2, t1: 1.9, mode: 'brush', pr: 0.95,
+        path: s => [0.18 + 0.64*s, 0.80 + 0.03*Math.sin(TAU*s)] },
+      { t0: 2.1, t1: 3.8, mode: 'brush', pr: 0.95,
+        path: s => [0.82 - 0.64*s, 0.62 - 0.03*Math.sin(TAU*s)] },
+      { t0: 4.0, t1: 5.7, mode: 'brush', pr: 0.95,
+        path: s => [0.18 + 0.64*s, 0.46 + 0.03*Math.sin(TAU*s)] },
+      { t0: 5.9, t1: 7.3, mode: 'brush', pr: 0.95,
+        path: s => [0.82 - 0.64*s, 0.72 + 0.03*Math.sin(TAU*s)] },
+      { t0: 7.5, t1: 8.9, mode: 'brush', pr: 0.95,
+        path: s => [0.18 + 0.64*s, 0.55 - 0.03*Math.sin(TAU*s)] },
+      { at: 9.4, fn: sim => sim.fix() },
+      { t0: 9.9,  t1: 10.2, white: 1, path: () => [0.30, 0.78], pr: 0.6 },
+      { t0: 10.35,t1: 10.6, white: 1, path: () => [0.52, 0.86], pr: 0.55 },
+      { t0: 10.75,t1: 11.0, white: 1, path: () => [0.74, 0.70], pr: 0.6 },
+      { t0: 11.15,t1: 11.4, white: 1, path: () => [0.40, 0.58], pr: 0.5 },
+      { t0: 11.6, t1: 12.5, white: 1, pr: 0.85,
+        path: s => [0.63 + 0.05*Math.cos(TAU*0.7*s + 2.2), 0.70 + 0.06*Math.sin(TAU*0.7*s + 2.2)] },
     ]),
   },
 };
