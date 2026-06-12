@@ -177,49 +177,25 @@
 
 <article>
 
-<h2 id="sketchbook"><span class="no">01</span>the sketchbook it wants to be</h2>
-
-<p>There is a particular kind of drawing that happens outdoors, on a bench, with cold
-fingers: pen-and-watercolor nature journaling. The kit is small — a waterproof fineliner,
-a waterbrush, maybe a tin of six half-pans. The method is older than the kit: you draw
-the thing in ink first, quick and committed, and then you float water and a little
-pigment over the lines. The ink holds the structure. The wash holds the light, the
-weather, the time of day.</p>
+<h2 id="sketchbook"><span class="no">01</span>inspiration</h2>
 
 <aside><span class="an"></span>A waterbrush is a nylon brush with a squeezable water
-reservoir in the handle — the tool that makes sketching watercolor on a park bench
-practical. Inkwash&rsquo;s brush mode is essentially a simulated waterbrush.</aside>
+reservoir in the handle, which I find a lot more practical than carrying around jars of water and traditional brushes.
+Inkwash&rsquo;s brush mode is essentially a simulated waterbrush.</aside>
 
-<p>What makes the combination feel alive is the <strong>asymmetry between the two
-tools</strong>. The pen is a statement: it puts pigment exactly where you say, and the
-mark never moves again. The brush is weather: it doesn&rsquo;t so much add paint as
-<em>release</em> what&rsquo;s already on the page, softening edges, pooling in valleys,
-drying with a darker rim. Half of the craft is knowing when to stop steering and let
-the water finish the sentence.</p>
+<p>I love <a href="https://johnmuirlaws.com/nature-journaling-starting-growing/">nature journaling</a>. Over time I've developed a style and approach that I like for capturing sketches quickly, using a Pilot G2 pen in combination with a waterbrush. This lets me add linework and shading simultaneously (I dual wield with the brush in my left hand) and forces me not to be too precious about the final result - there will inevitably be smudges and imperfections, and there is no undo with pen!</p>
+
+<p>This project began as a test of Anthropic's new model Claude Fable 5, and grew once I saw the potential to actually recreate that experience in a browser. I love the final result!</p>
 
 <figure class="fig">
   <img src="images/sketches.png" alt="Pen and watercolor sketches: a robot with washes of violet and blue, and pen studies of flamingos and an emu"
        style="display:block; width:100%; border:1px solid var(--ink-16); border-radius:2px;">
-  <figcaption>Example sketches from my notebooks.</figcaption>
+  <figcaption>Example sketches from my notebooks, from fast flamingo figure-drawings to more finessed fan-art fun.</figcaption>
 </figure>
 
-<p>Inkwash is an attempt to put that asymmetry in a browser. It makes one slightly
-unusual design decision, and almost everything else on this page follows from it:</p>
+<p>Of course, I'm left in a rather funny position: I've 'created' this app, but I haven't actually touched the code! I can read it (it's a rather nice, self-contained <a href="https://github.com/johnowhitaker/inkwash/blob/main/index.html">single HTML file</a>) since I have experience with the underlying technologies. But I'm hoping that this app is interesting to many people who *aren't* webGL nerds, and so for the sake of all of our collective understanding I've had Fable spin up some interactive demos to illustrate the concepts. You are also welcome to check out the <a href="https://github.com/johnowhitaker/inkwash/blob/main/prompts.md">prompts</a> I used to conjure this app into being.</p>
 
-<p style="margin: 1.8em 0; padding-left: 22px; border-left: 1px solid var(--hair);">
-<strong>The brush carries no pigment.</strong> It carries water, and a push.
-The pen lays ink; the brush lays wetness and momentum into a fluid simulation,
-and the ink only moves where the paper is wet.</p>
-
-<p>There&rsquo;s a second inheritance from the physical world hiding in there too. If
-you&rsquo;ve ever drawn with a cheap black fountain pen and then hit the line with a wet
-brush, you know that black ink is rarely black: it chromatographs into blue and violet
-halos as the water carries its dyes at different speeds. Inkwash simulates that — it is,
-honestly, the whole reason the app exists — and <a href="#chroma">section 06</a> is
-about how.</p>
-
-<p>The rest of the brief was aesthetic discipline: one file, no dependencies, no UI
-until you reach for it. A blank sheet of paper that happens to be a fluid solver.</p>
+<p><b>Disclaimer: While I've tidied up a bit, the rest of this article contains plenty of AI-witten prose. I don't like AI writing as a rule, especially undisclosed! Hopefully you can forgive me in this case, since (with some iteration) the AI actually did a pretty good job showing all the key pieces.</b> Over time I might refactor and reorganise it to be more in line with my personal sensibilities, but no promises :)</p>
 
 <h2 id="state"><span class="no">02</span>three sheets of state</h2>
 
