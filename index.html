@@ -52,6 +52,7 @@
        color: rgba(38,38,48,.45); font-family: inherit; border-bottom: 1px solid transparent; }
   #ui button:hover { color: rgba(38,38,48,.85); border-bottom-color: rgba(38,38,48,.4); }
   #ui button.mode { color: rgba(38,38,48,.7); min-width: 52px; }
+  #ui button.menu-toggle { display: none; }
   input[type=color] { -webkit-appearance: none; appearance: none; width: 16px; height: 16px;
        padding: 0; border: 1px solid rgba(38,38,48,.45); border-radius: 50%;
        background: none; cursor: pointer; }
@@ -72,6 +73,79 @@
   body.touch input[type=range]::-webkit-slider-thumb { width: 15px; height: 15px; margin-top: -7px; }
   body.touch #ui button { font-size: 10.5px; padding: 8px 4px 5px; }
   body.touch .ctl { gap: 4px; }
+
+  @media (max-width: 600px) {
+    #ui {
+      left: auto; right: calc(10px + env(safe-area-inset-right));
+      transform: none; max-width: calc(100vw - 20px - env(safe-area-inset-left) - env(safe-area-inset-right));
+      width: auto; justify-content: flex-end; align-items: flex-end;
+      flex-wrap: wrap; gap: 8px; padding: 8px; border-radius: 14px;
+    }
+    #ui:not(.open) { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
+    #ui .ctl { display: none; }
+    #ui .ctl.mode-ctl, #ui.open .ctl, #ui button.menu-toggle { display: flex; }
+    #ui.open { width: min(312px, calc(100vw - 20px - env(safe-area-inset-left) - env(safe-area-inset-right))); }
+    #ui.open .ctl {
+      flex: 0 0 70px; min-height: 43px;
+      justify-content: flex-end;
+    }
+    #ui.open .ctl.mode-ctl { order: -2; }
+    #ui button {
+      min-width: 38px; min-height: 38px;
+      padding: 0; border: 1px solid rgba(38,38,48,.28);
+      border-radius: 50%; background: rgba(241,239,232,.72);
+      -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    }
+    #ui.open button:not(.mode):not(.menu-toggle) {
+      min-width: 0; min-height: 0;
+      padding: 8px 4px 5px;
+      border: none; border-radius: 0; background: none;
+      -webkit-backdrop-filter: none; backdrop-filter: none;
+    }
+    #ui button.menu-toggle {
+      position: relative;
+      align-items: center; justify-content: center;
+    }
+    #ui.open button.menu-toggle { order: 99; }
+    #ui button.menu-toggle::before,
+    #ui button.menu-toggle::after,
+    #ui button.menu-toggle span {
+      content: ""; display: block; position: absolute;
+      width: 15px; height: 1px; background: rgba(38,38,48,.68);
+      transition: transform .2s ease, opacity .2s ease;
+    }
+    #ui button.menu-toggle::before { transform: translateY(-5px); }
+    #ui button.menu-toggle::after { transform: translateY(5px); }
+    #ui.open button.menu-toggle::before { transform: rotate(45deg); }
+    #ui.open button.menu-toggle::after { transform: rotate(-45deg); }
+    #ui.open button.menu-toggle span { opacity: 0; }
+    #ui .ctl.mode-ctl label { display: none; }
+    #ui .ctl.mode-ctl button.mode {
+      position: relative; min-width: 38px; color: transparent;
+      font-size: 0; letter-spacing: 0;
+    }
+    #ui .ctl.mode-ctl button.mode::before,
+    #ui .ctl.mode-ctl button.mode::after {
+      content: ""; position: absolute; left: 50%; top: 50%;
+      background: rgba(38,38,48,.68); pointer-events: none;
+    }
+    #ui .ctl.mode-ctl button.mode.mode-pen::before {
+      width: 20px; height: 2px; border-radius: 2px;
+      transform: translate(-50%, -50%) rotate(-42deg);
+    }
+    #ui .ctl.mode-ctl button.mode.mode-pen::after {
+      width: 5px; height: 5px; border-radius: 50%;
+      transform: translate(4px, -10px);
+    }
+    #ui .ctl.mode-ctl button.mode.mode-brush::before {
+      width: 8px; height: 19px; border-radius: 8px 8px 3px 3px;
+      transform: translate(-50%, -50%) rotate(28deg);
+    }
+    #ui .ctl.mode-ctl button.mode.mode-brush::after {
+      width: 16px; height: 2px; border-radius: 2px;
+      transform: translate(-50%, 7px) rotate(28deg);
+    }
+  }
 </style>
 </head>
 <body>
@@ -79,7 +153,8 @@
 <div id="cursor"></div>
 <div id="hint">pen<br>hold pen button for brush · water blends the ink</div>
 <div id="ui">
-  <div class="ctl"><label>mode</label><button id="bMode" class="mode">pen</button></div>
+  <div class="ctl mode-ctl"><label>mode</label><button id="bMode" class="mode mode-pen" aria-label="Mode: pen">pen</button></div>
+  <button id="bMenu" class="menu-toggle" aria-label="Show controls" aria-expanded="false"><span></span></button>
   <div class="ctl"><label>ink</label><button id="bInk" class="mode">black</button></div>
   <!-- ink hue picker: delete this element (and its JS block) to return to pure b&w -->
   <div class="ctl"><label>hue</label><input id="cInk" type="color" value="#16161e"></div>
@@ -103,6 +178,7 @@ const cursorEl = document.getElementById('cursor');
 const hintEl = document.getElementById('hint');
 const uiEl = document.getElementById('ui');
 const modeBtn = document.getElementById('bMode');
+const menuBtn = document.getElementById('bMenu');
 const DEMO = /demo/.test(location.search);
 
 const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -922,8 +998,18 @@ bindSlider('sBink', 'BINK');
 function setMode(m){
   uiMode = m;
   modeBtn.textContent = m;
+  modeBtn.classList.toggle('mode-pen', m === 'pen');
+  modeBtn.classList.toggle('mode-brush', m === 'brush');
+  modeBtn.setAttribute('aria-label', 'Mode: ' + m);
 }
 modeBtn.addEventListener('click', () => setMode(uiMode === 'pen' ? 'brush' : 'pen'));
+
+function setMenuOpen(open){
+  uiEl.classList.toggle('open', open);
+  menuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  menuBtn.setAttribute('aria-label', open ? 'Hide controls' : 'Show controls');
+}
+menuBtn.addEventListener('click', () => setMenuOpen(!uiEl.classList.contains('open')));
 
 const inkBtn = document.getElementById('bInk');
 function setInkWhite(v){
@@ -954,8 +1040,8 @@ function toggleFullscreen(){
   }
 }
 
-document.getElementById('bFix').addEventListener('click', fixDrawing);
-document.getElementById('bClear').addEventListener('click', clearAll);
+document.getElementById('bFix').addEventListener('click', () => { fixDrawing(); setMenuOpen(false); });
+document.getElementById('bClear').addEventListener('click', () => { clearAll(); setMenuOpen(false); });
 
 function savePNG(){
   render();
@@ -968,7 +1054,7 @@ function savePNG(){
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   });
 }
-document.getElementById('bSave').addEventListener('click', savePNG);
+document.getElementById('bSave').addEventListener('click', () => { savePNG(); setMenuOpen(false); });
 
 window.addEventListener('keydown', e => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
