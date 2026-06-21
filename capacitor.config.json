@@ -1,0 +1,19 @@
+{
+  "appId": "com.hansf.inkwash",
+  "appName": "inkwash",
+  "webDir": "www",
+  "backgroundColor": "#f1efe8",
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": false,
+      "backgroundColor": "#f1efe8",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP"
+    },
+    "StatusBar": {
+      "style": "LIGHT",
+      "backgroundColor": "#f1efe8",
+      "overlaysWebView": false
+    }
+  }
+}

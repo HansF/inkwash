@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE = 'inkwash-v1';
+const CACHE = 'inkwash-v2';
 const SHELL = [
   './',
   './index.html',
@@ -11,6 +11,22 @@ const SHELL = [
   './icons/icon-512.png',
   './images/inkwash_tests.png',
   './images/sketches.png',
+  './js/main.js',
+  './js/config.js',
+  './js/gl.js',
+  './js/shaders.js',
+  './js/sim.js',
+  './js/input.js',
+  './js/ui.js',
+  './js/gallery.js',
+  './js/storage.js',
+  './js/share.js',
+  './js/native.js',
+  './js/onboarding.js',
+  './js/tools/index.js',
+  './js/tools/pen.js',
+  './js/tools/brush.js',
+  './js/tools/fude.js',
 ];
 
 self.addEventListener('install', e => {

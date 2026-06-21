@@ -1,0 +1,13 @@
+# dependencies
+node_modules/
+
+# generated Capacitor web bundle
+www/
+
+# generated native platform projects
+/android/
+/ios/
+
+# misc
+.DS_Store
+*.log

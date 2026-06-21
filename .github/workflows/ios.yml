@@ -1,0 +1,42 @@
+name: Build iOS (simulator, unsigned)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Assemble www/ and add the iOS platform
+        run: |
+          npm run build:www
+          npx cap add ios
+          npx cap sync ios
+
+      - name: CocoaPods install
+        working-directory: ios/App
+        run: pod install
+
+      # Simulator build needs no code signing — verifies the app compiles & links.
+      - name: Build for simulator
+        working-directory: ios/App
+        run: |
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build
