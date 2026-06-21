@@ -6,6 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#f1efe8">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-title" content="inkwash">
 <title>inkwash</title>
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #f1efe8; }
@@ -61,6 +64,48 @@
   body.touch input[type=color] { width: 22px; height: 22px; }
   .err { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
          font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: rgba(38,38,48,.5); }
+
+  /* gallery modal */
+  #gallery { position: fixed; inset: 0; z-index: 20; background: rgba(241,239,232,.97);
+             -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+             display: flex; flex-direction: column; opacity: 0; pointer-events: none;
+             transition: opacity .25s ease; }
+  #gallery.open { opacity: 1; pointer-events: auto; }
+  #gallery-header { display: flex; align-items: center; gap: 16px; padding: 20px 24px 14px;
+                    border-bottom: 1px solid rgba(38,38,48,.12); flex-shrink: 0; }
+  #gallery-header h2 { margin: 0; font: 300 13px/1 'Helvetica Neue', Helvetica, sans-serif;
+                       letter-spacing: .38em; text-transform: uppercase; color: rgba(38,38,48,.7);
+                       flex: 1; }
+  #gallery-header button { background: none; border: none; cursor: pointer; padding: 0;
+                            font: 9px/1 'Helvetica Neue', Helvetica, sans-serif;
+                            letter-spacing: .32em; text-transform: uppercase; color: rgba(38,38,48,.5);
+                            font-family: inherit; border-bottom: 1px solid transparent; }
+  #gallery-header button:hover { color: rgba(38,38,48,.9); border-bottom-color: rgba(38,38,48,.35); }
+  #bGalClose { font-size: 18px; letter-spacing: 0; color: rgba(38,38,48,.4); line-height: 1;
+               padding: 4px; border-bottom: none !important; }
+  #gallery-grid { flex: 1; overflow-y: auto; padding: 24px;
+                  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;
+                  align-content: start; }
+  #gallery-empty { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+                   font: 9.5px/2 'Helvetica Neue', Helvetica, sans-serif;
+                   letter-spacing: .38em; text-transform: uppercase; color: rgba(38,38,48,.3);
+                   text-align: center; pointer-events: none; }
+  .gal-card { display: flex; flex-direction: column; gap: 8px; }
+  .gal-card img { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 3px;
+                  border: 1px solid rgba(38,38,48,.12); display: block; }
+  .gal-card-foot { display: flex; align-items: center; gap: 8px; }
+  .gal-card-date { flex: 1; font: 9px/1 'Helvetica Neue', Helvetica, sans-serif;
+                   letter-spacing: .24em; text-transform: uppercase; color: rgba(38,38,48,.38); }
+  .gal-card-foot button { background: none; border: none; cursor: pointer; padding: 2px 4px;
+                           font: 9px/1 'Helvetica Neue', Helvetica, sans-serif;
+                           letter-spacing: .24em; text-transform: uppercase; color: rgba(38,38,48,.42);
+                           font-family: inherit; border-bottom: 1px solid transparent; }
+  .gal-card-foot button:hover { color: rgba(38,38,48,.85); border-bottom-color: rgba(38,38,48,.3); }
+  .gal-saving { opacity: .5; pointer-events: none; }
+  @media (max-width: 600px) {
+    #gallery-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); padding: 14px; gap: 12px; }
+    #gallery-header { padding: 14px 16px 10px; }
+  }
 
   /* touch devices: controls always visible, finger-sized, above the home indicator */
   body.touch #ui { opacity: 1; pointer-events: auto;
@@ -175,6 +220,18 @@
   <div class="ctl"><button id="bFix">fix</button></div>
   <div class="ctl"><button id="bClear">clear</button></div>
   <div class="ctl"><button id="bSave">save</button></div>
+  <div class="ctl"><button id="bGallery">gallery</button></div>
+</div>
+
+<div id="gallery">
+  <div id="gallery-header">
+    <h2>saved paintings</h2>
+    <button id="bGalSave">save current</button>
+    <button id="bGalClose" aria-label="Close gallery">&#x2715;</button>
+  </div>
+  <div id="gallery-grid">
+    <div id="gallery-empty">no saved paintings yet</div>
+  </div>
 </div>
 
 <script>
@@ -189,10 +246,10 @@ const modeBtn = document.getElementById('bMode');
 const menuBtn = document.getElementById('bMenu');
 const DEMO = /demo/.test(location.search);
 
-const dpr = Math.min(window.devicePixelRatio || 1, 2);
 function fitCanvas(){
-  canvas.width = Math.max(2, Math.floor(innerWidth * dpr));
-  canvas.height = Math.max(2, Math.floor(innerHeight * dpr));
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  canvas.width = Math.max(2, Math.round(innerWidth * dpr));
+  canvas.height = Math.max(2, Math.round(innerHeight * dpr));
 }
 fitCanvas();
 
@@ -214,8 +271,6 @@ if (TOUCH){
 const P = { SIZE: 0.5, FLOW: 0.6, BLEED: 0.5, DRY: 0.45, COLOR: 0.5, BINK: 0.0 };
 
 const SIM_BASE = DEMO ? 192 : 256;       // velocity / pressure grid
-// pigment + wetness grid: match the screen, never exceed it (portrait phones included)
-const DYE_BASE = DEMO ? 1024 : Math.min(2048, Math.min(canvas.width, canvas.height));
 const PRESSURE_ITER = 22;
 
 const INK_ABS = [1.00, 0.97, 0.88];      // near-black ink, faintly cool
@@ -545,7 +600,8 @@ const HF = gl.HALF_FLOAT;
 let velocity, divergence, curl, pressure, ink, fixed, wet;
 
 function initTargets(){
-  const sim = getRes(SIM_BASE), dye = getRes(DYE_BASE);
+  const dyeBase = DEMO ? 1024 : Math.min(2048, Math.min(canvas.width, canvas.height));
+  const sim = getRes(SIM_BASE), dye = getRes(dyeBase);
   velocity  = createDouble(sim.w, sim.h, gl.RG16F, gl.RG, HF, gl.LINEAR);
   divergence= createFBO(sim.w, sim.h, gl.R16F, gl.RED, HF, gl.NEAREST);
   curl      = createFBO(sim.w, sim.h, gl.R16F, gl.RED, HF, gl.NEAREST);
@@ -565,7 +621,7 @@ function copyInto(srcTex, dst){
 }
 
 let resizeTimer = null;
-window.addEventListener('resize', () => {
+function onResize(){
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
     const oldInk = ink.read.tex, oldFix = fixed.read.tex, oldWet = wet.read.tex, oldVel = velocity.read.tex;
@@ -576,7 +632,9 @@ window.addEventListener('resize', () => {
     copyInto(oldFix, fixed.write); fixed.swap();
     copyInto(oldWet, wet.write); wet.swap();
   }, 180);
-});
+}
+window.addEventListener('resize', onResize);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
 
 function clearAll(){
   for (const d of [velocity, pressure, ink, fixed, wet]){
@@ -1102,6 +1160,7 @@ function savePNG(){
   });
 }
 document.getElementById('bSave').addEventListener('click', () => { savePNG(); setMenuOpen(false); });
+document.getElementById('bGallery').addEventListener('click', () => { openGallery(); setMenuOpen(false); });
 
 window.addEventListener('keydown', e => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -1111,9 +1170,157 @@ window.addEventListener('keydown', e => {
   if (e.key === 'f') toggleFullscreen();
   if (e.key === 'c') clearAll();
   if (e.key === 's') savePNG();
+  if (e.key === 'g') openGallery();
+  if (e.key === 'Escape') closeGallery();
 });
 
+/* ---------------- gallery (IndexedDB) ---------------- */
+
+function openGallery(){
+  document.getElementById('gallery').classList.add('open');
+  loadGallery();
+}
+function closeGallery(){
+  document.getElementById('gallery').classList.remove('open');
+}
+document.getElementById('bGalClose').addEventListener('click', closeGallery);
+document.getElementById('bGalSave').addEventListener('click', () => {
+  const btn = document.getElementById('bGalSave');
+  btn.textContent = 'saving…';
+  btn.classList.add('gal-saving');
+  savePainting().then(() => {
+    loadGallery();
+  }).finally(() => {
+    btn.textContent = 'save current';
+    btn.classList.remove('gal-saving');
+  });
+});
+
+function openDB(){
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('inkwash', 1);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('paintings')){
+        const store = db.createObjectStore('paintings', { keyPath: 'id' });
+        store.createIndex('ts', 'ts', { unique: false });
+      }
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = e => reject(e.target.error);
+  });
+}
+
+function makeThumbnail(sourceCanvas, maxW){
+  return new Promise(resolve => {
+    const ar = sourceCanvas.width / sourceCanvas.height;
+    const tw = maxW, th = Math.round(maxW / ar);
+    const tc = document.createElement('canvas');
+    tc.width = tw; tc.height = th;
+    tc.getContext('2d').drawImage(sourceCanvas, 0, 0, tw, th);
+    tc.toBlob(resolve, 'image/jpeg', 0.82);
+  });
+}
+
+function savePainting(){
+  render();
+  return Promise.all([
+    new Promise(r => canvas.toBlob(r, 'image/png')),
+    makeThumbnail(canvas, 640),
+  ]).then(([full, thumb]) => openDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction('paintings', 'readwrite');
+    tx.objectStore('paintings').add({
+      id: crypto.randomUUID(),
+      ts: Date.now(),
+      full,
+      thumb,
+    });
+    tx.oncomplete = resolve;
+    tx.onerror = e => reject(e.target.error);
+  })));
+}
+
+function blobToDataURL(blob){
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = e => resolve(e.target.result);
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
+
+function loadGallery(){
+  const grid = document.getElementById('gallery-grid');
+  openDB().then(db => {
+    const tx = db.transaction('paintings', 'readonly');
+    const req = tx.objectStore('paintings').index('ts').getAll();
+    req.onsuccess = e => {
+      const items = e.target.result.reverse();
+      grid.innerHTML = '';
+      if (!items.length){
+        const d = document.createElement('div');
+        d.id = 'gallery-empty';
+        d.textContent = 'no saved paintings yet';
+        grid.appendChild(d);
+        return;
+      }
+      items.forEach(item => {
+        const date = new Date(item.ts);
+        const label = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                    + ' · ' + date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        const card = document.createElement('div');
+        card.className = 'gal-card';
+        card.innerHTML = `
+          <img alt="painting from ${label}">
+          <div class="gal-card-foot">
+            <span class="gal-card-date">${label}</span>
+            <button data-id="${item.id}" data-action="dl">export</button>
+            <button data-id="${item.id}" data-action="del">delete</button>
+          </div>`;
+        grid.appendChild(card);
+        blobToDataURL(item.thumb).then(url => { card.querySelector('img').src = url; });
+      });
+      grid.querySelectorAll('button[data-action]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.id;
+          if (btn.dataset.action === 'dl') downloadPainting(id);
+          else deletePainting(id);
+        });
+      });
+    };
+  });
+}
+
+function downloadPainting(id){
+  openDB().then(db => {
+    const req = db.transaction('paintings', 'readonly').objectStore('paintings').get(id);
+    req.onsuccess = e => {
+      if (!e.target.result) return;
+      const url = URL.createObjectURL(e.target.result.full);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'inkwash-' + new Date(e.target.result.ts).toISOString().slice(0,16).replace(/[T:]/g,'-') + '.png';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    };
+  });
+}
+
+function deletePainting(id){
+  openDB().then(db => {
+    const tx = db.transaction('paintings', 'readwrite');
+    tx.objectStore('paintings').delete(id);
+    tx.oncomplete = () => loadGallery();
+  });
+}
+
 })();
+</script>
+
+<script>
+if ('serviceWorker' in navigator){
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
+}
 </script>
 </body>
 </html>

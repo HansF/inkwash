@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#f1efe8"/>
+  <!-- ink drop: teardrop shape -->
+  <path d="M256 96 C256 96 148 248 148 320 a108 108 0 0 0 216 0 C364 248 256 96 256 96 Z" fill="#26262f"/>
+  <!-- highlight glint -->
+  <ellipse cx="224" cy="300" rx="18" ry="28" fill="#f1efe8" opacity="0.22" transform="rotate(-20 224 300)"/>
+</svg>
