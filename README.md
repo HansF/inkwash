@@ -62,3 +62,14 @@ status bar, splash screen, hardware back button, and the system share sheet are
 wired in `js/native.js` and `js/share.js`, all behind `Capacitor.isNativePlatform()`
 so the identical source still runs as a plain web PWA.
 
+## CI (GitHub Actions)
+
+- **`pages.yml`** — deploys the web PWA to GitHub Pages on push to `main`
+  (set Pages source to "GitHub Actions" in repo settings).
+- **`android.yml`** / **`ios.yml`** — build a debug APK (uploaded as an
+  artifact) and an unsigned iOS simulator build on every push/PR.
+- **`android-release.yml`** — on a `v*` tag, builds a **signed** release APK and
+  attaches it to a GitHub Release. Add these repo secrets first:
+  `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
+  `ANDROID_KEY_PASSWORD`.
+
