@@ -145,13 +145,21 @@
       width: 16px; height: 2px; border-radius: 2px;
       transform: translate(-50%, 7px) rotate(28deg);
     }
+    #ui .ctl.mode-ctl button.mode.mode-fude::before {
+      width: 22px; height: 6px; border-radius: 80% 18% 18% 80%;
+      transform: translate(-50%, -50%) rotate(28deg);
+    }
+    #ui .ctl.mode-ctl button.mode.mode-fude::after {
+      width: 7px; height: 7px; border-radius: 50%;
+      transform: translate(5px, -8px);
+    }
   }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <div id="cursor"></div>
-<div id="hint">pen<br>hold pen button for brush · water blends the ink</div>
+<div id="hint">pen<br>hold pen button for water · tap mode for fude calligraphy</div>
 <div id="ui">
   <div class="ctl mode-ctl"><label>mode</label><button id="bMode" class="mode mode-pen" aria-label="Mode: pen">pen</button></div>
   <button id="bMenu" class="menu-toggle" aria-label="Show controls" aria-expanded="false"><span></span></button>
@@ -198,7 +206,7 @@ const TOUCH = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoint
 if (TOUCH){
   document.body.classList.add('touch');
   uiEl.classList.add('show');
-  hintEl.innerHTML = 'draw<br>with a pencil, your finger becomes the water brush';
+  hintEl.innerHTML = 'draw<br>pencil makes ink; finger is water; mode adds fude brush';
 }
 
 /* ---------------- parameters ---------------- */
@@ -303,9 +311,13 @@ const splatFS = `#version 300 es
 precision highp float; in vec2 vUv; out vec4 o;
 uniform float uAspect; uniform vec2 uPoint;
 uniform vec4 uColor; uniform float uRadius;
+uniform vec2 uShape; // x: angle, y: length stretch (1 = round)
 void main(){
   vec2 p = vUv - uPoint; p.x *= uAspect;
-  o = uColor * exp(-dot(p,p) / uRadius);
+  float c = cos(uShape.x), s = sin(uShape.x);
+  vec2 q = vec2(c*p.x + s*p.y, -s*p.x + c*p.y);
+  q.x /= max(uShape.y, 0.1);
+  o = uColor * exp(-dot(q,q) / uRadius);
 }`;
 
 // velocity: self-advect, damp, and confine to wet paper
@@ -578,7 +590,7 @@ function clearAll(){
 
 /* ---------------- splats (blended, scissored) ---------------- */
 
-function splat(target, x, y, r, c, useMax){
+function splat(target, x, y, r, c, useMax, angle = 0, stretch = 1){
   const f = target.read;
   gl.bindFramebuffer(gl.FRAMEBUFFER, f.fbo);
   gl.viewport(0, 0, f.w, f.h);
@@ -594,6 +606,7 @@ function splat(target, x, y, r, c, useMax){
   gl.uniform2f(progSplat.u.uPoint, x, y);
   gl.uniform4f(progSplat.u.uColor, c[0], c[1], c[2], c[3]);
   gl.uniform1f(progSplat.u.uRadius, r * r);
+  gl.uniform2f(progSplat.u.uShape, angle, stretch);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   gl.blendEquation(gl.FUNC_ADD);
   gl.disable(gl.BLEND);
@@ -695,6 +708,10 @@ function penRadius(pr, speed){
 function brushRadius(pr, speed){
   return (0.014 + 0.060 * pr) * (1 + Math.min(speed, 2.5) * 0.28) * sizeMult();
 }
+function fudeRadius(pr, speed){
+  // Fude / sumi-e brush: broad at pressure, tapering with faster movement.
+  return (0.004 + 0.036 * Math.pow(pr, 1.35)) * Math.min(Math.max(1.35 - speed * 0.22, 0.45), 1.35) * sizeMult();
+}
 let inkAbs = INK_ABS.slice();
 function inkColor(dens){
   return inkWhite ? [0, 0, 0, dens]
@@ -738,6 +755,32 @@ function updateBrush(dt){
       splat(ink, x, y, radius, inkColor(dens), false);
       if (i % 2 === 0 || steps === 1)
         splat(wet, x, y, radius * 2.8, [0.16, 0, 0, 0], true);    // fresh ink is faintly wet
+    }
+  } else if (mode === 'fude'){
+    const radius = fudeRadius(pr, speed);
+    brushNow.x = ptr.bx; brushNow.y = ptr.by; brushNow.r = radius * 1.7;
+    const angle = Math.atan2(dy, dx || 1e-6);
+    const stretch = 1.7 + 2.4 * Math.min(speed, 1.8) + 0.8 * pr;
+    const dens = (0.95 + 1.85 * pr) * Math.min(Math.max(1.35 - speed * 0.38, 0.45), 1.35) * (0.45 + 0.55 * P.FLOW);
+    const wetAmp = 0.22 + 0.58 * (1 - P.DRY) + 0.22 * pr;
+    const dryBrush = P.DRY * Math.min(Math.max(speed * 0.7 + (1 - pr) * 0.9, 0), 1);
+    const bristles = 3 + Math.round(dryBrush * 5);
+    const spacing = Math.max(radius * 0.38, 0.0015);
+    const steps = dist < radius * 0.22 ? 1 : Math.min(Math.ceil(dist / spacing), 28);
+    const nx = -Math.sin(angle), ny = Math.cos(angle);
+    for (let i = 1; i <= steps; i++){
+      const t = steps === 1 ? 1 : i / steps;
+      const x = px + dx * t, y = py + dy * t;
+      splat(wet, x, y, radius * 1.25, [wetAmp, 0, 0, 0], true, angle, stretch * 0.85);
+      for (let j = 0; j < bristles; j++){
+        const u = bristles === 1 ? 0 : (j / (bristles - 1) - 0.5);
+        const skip = dryBrush > 0.35 && ((i + j * 3) % 7 === 0);
+        if (skip) continue;
+        const off = u * radius * stretch * 0.45;
+        const strand = 1 - Math.abs(u) * (0.45 + dryBrush * 0.35);
+        const strandR = radius * (0.78 - dryBrush * 0.38) * (0.82 + 0.18 * strand);
+        splat(ink, x + nx * off, y + ny * off, strandR, inkColor(dens * strand * (1 - dryBrush * 0.45)), false, angle, stretch);
+      }
     }
   } else {
     const radius = brushRadius(pr, speed);
@@ -971,13 +1014,13 @@ function updateCursor(){
   cursorEl.style.opacity = 1;
   const mode = activeMode();
   const pr = ptr.down ? pressureNow() : 0.3;
-  const radius = mode === 'brush' ? brushRadius(pr, ptr.down ? ptr.speed : 0) : penRadius(pr, 0);
+  const radius = mode === 'brush' ? brushRadius(pr, ptr.down ? ptr.speed : 0) : mode === 'fude' ? fudeRadius(pr, ptr.down ? ptr.speed : 0) : penRadius(pr, 0);
   const d = Math.max(radius * 2 * innerHeight, 4);
   cursorEl.style.width = d + 'px';
   cursorEl.style.height = d + 'px';
   cursorEl.style.left = ptr.cx + 'px';
   cursorEl.style.top = ptr.cy + 'px';
-  cursorEl.classList.toggle('brush', mode === 'brush');
+  cursorEl.classList.toggle('brush', mode === 'brush' || mode === 'fude');
   cursorEl.classList.toggle('white', inkWhite);
 }
 
@@ -1000,9 +1043,13 @@ function setMode(m){
   modeBtn.textContent = m;
   modeBtn.classList.toggle('mode-pen', m === 'pen');
   modeBtn.classList.toggle('mode-brush', m === 'brush');
+  modeBtn.classList.toggle('mode-fude', m === 'fude');
   modeBtn.setAttribute('aria-label', 'Mode: ' + m);
 }
-modeBtn.addEventListener('click', () => setMode(uiMode === 'pen' ? 'brush' : 'pen'));
+function nextMode(){
+  setMode(uiMode === 'pen' ? 'brush' : uiMode === 'brush' ? 'fude' : 'pen');
+}
+modeBtn.addEventListener('click', nextMode);
 
 function setMenuOpen(open){
   uiEl.classList.toggle('open', open);
@@ -1058,7 +1105,7 @@ document.getElementById('bSave').addEventListener('click', () => { savePNG(); se
 
 window.addEventListener('keydown', e => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
-  if (e.key === 'b') setMode(uiMode === 'pen' ? 'brush' : 'pen');
+  if (e.key === 'b') nextMode();
   if (e.key === 'w') setInkWhite(!inkWhite);
   if (e.key === 'd') fixDrawing();
   if (e.key === 'f') toggleFullscreen();
