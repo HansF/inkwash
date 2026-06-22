@@ -40,7 +40,10 @@ export const ptr = {
 
 /* ---------------- pure helpers ---------------- */
 
-export function sizeMult(){ return Math.pow(3, (P.SIZE - 0.5) * 2); }   // 1/3x .. 3x
+// brush scale from the size slider. Recalibrated smaller: the old 1/3x..3x range
+// made every brush huge at the top end (fude filled the screen). New range is
+// ~0.2x (min) .. 0.6x (max), so the slider's max ≈ the old ~25% feel.
+export function sizeMult(){ return 0.2 * Math.pow(3, P.SIZE); }
 
 export function inkColor(dens){
   return state.inkWhite ? [0, 0, 0, dens]

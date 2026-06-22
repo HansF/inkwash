@@ -23,10 +23,11 @@ export function initNative(){
 
   const StatusBar = plugin('StatusBar');
   if (StatusBar){
-    // paper background, dark icons/text sitting on it
-    StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
-    StatusBar.setStyle({ style: 'LIGHT' }).catch(() => {});   // LIGHT = dark text for light bg
-    StatusBar.setBackgroundColor({ color: '#f1efe8' }).catch(() => {});   // Android only
+    // Android 15+ (edge-to-edge) ignores setBackgroundColor, so instead let the
+    // WebView draw under the status bar — the paper page background shows through.
+    // viewport-fit=cover + the safe-area insets in CSS keep content clear of it.
+    StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
+    StatusBar.setStyle({ style: 'LIGHT' }).catch(() => {});   // LIGHT = dark icons for light bg
   }
 
   const App = plugin('App');

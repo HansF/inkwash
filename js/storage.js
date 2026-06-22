@@ -11,6 +11,7 @@ export const DEFAULT_HEX = '#16161e';
 let colorHex = DEFAULT_HEX;
 
 export function getColorHex(){ return colorHex; }
+export function setColorHex(hex){ colorHex = hex; }
 
 export function loadSettings(){
   let raw;
@@ -28,7 +29,6 @@ export function loadSettings(){
 }
 
 export function saveSettings(){
-  colorHex = (document.getElementById('cInk') || {}).value || colorHex;
   const data = {
     P: { ...P },
     tool: state.uiMode,

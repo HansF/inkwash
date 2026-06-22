@@ -1,18 +1,48 @@
 'use strict';
 
-import { P, state, ptr, applyInkHex } from './config.js';
+import { P, state, ptr, TOUCH, applyInkHex } from './config.js';
 import { toolById, nextToolId, resolveActiveTool } from './tools/index.js';
 import { pressureNow } from './input.js';
 import { fixDrawing, clearAll } from './sim.js';
 import { shareOrSavePNG } from './share.js';
 import { openGallery, closeGallery } from './gallery.js';
-import { scheduleSave, getColorHex } from './storage.js';
+import { scheduleSave, getColorHex, setColorHex } from './storage.js';
 
 const cursorEl = document.getElementById('cursor');
 const uiEl = document.getElementById('ui');
 const modeBtn = document.getElementById('bMode');
 const menuBtn = document.getElementById('bMenu');
-const inkBtn = document.getElementById('bInk');
+
+/* ---------------- ink palette ---------------- *
+ * One control for ink colour: a row of swatches. White is just the last
+ * swatch (it paints opaque gouache rather than absorptive ink).            */
+const INK_SWATCHES = [
+  { id: 'black',   hex: '#16161e' },
+  { id: 'indigo',  hex: '#26356b' },
+  { id: 'sepia',   hex: '#5b3a23' },
+  { id: 'crimson', hex: '#8d1f2b' },
+  { id: 'white',   white: true },
+];
+const swatchEls = [];
+
+function refreshSwatchActive(){
+  const hex = getColorHex().toLowerCase();
+  for (const el of swatchEls){
+    const isWhite = el.dataset.white === '1';
+    const on = state.inkWhite ? isWhite : (!isWhite && el.dataset.hex === hex);
+    el.classList.toggle('active', on);
+  }
+}
+
+function selectSwatch(el){
+  if (el.dataset.white === '1'){
+    setInkWhite(true);
+  } else {
+    applyInkHex(el.dataset.hex);
+    setColorHex(el.dataset.hex);
+    setInkWhite(false);   // also refreshes active swatch + saves
+  }
+}
 
 /* ---------------- mode / tool button ---------------- */
 
@@ -29,14 +59,15 @@ export function nextMode(){ setMode(nextToolId(state.uiMode)); }
 
 export function setMenuOpen(open){
   uiEl.classList.toggle('open', open);
+  menuBtn.textContent = open ? 'less' : 'more';
   menuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-  menuBtn.setAttribute('aria-label', open ? 'Hide controls' : 'Show controls');
+  menuBtn.setAttribute('aria-label', open ? 'Fewer controls' : 'More controls');
 }
 export function menuOpen(){ return uiEl.classList.contains('open'); }
 
 export function setInkWhite(v){
   state.inkWhite = v;
-  inkBtn.textContent = v ? 'white' : 'black';
+  refreshSwatchActive();
   scheduleSave();
 }
 
@@ -60,8 +91,17 @@ function bindSlider(id, key){
 /* ---------------- cursor ring ---------------- */
 
 export function updateCursor(){
-  if (ptr.type === 'touch'){ cursorEl.style.opacity = 0; return; }   // ring under a finger is noise
-  if (!ptr.inWindow && !ptr.down){ cursorEl.style.opacity = 0; return; }
+  // Ambient control visibility: the bar gets out of the way while you draw.
+  // On desktop it surfaces only when you reach toward it (lower screen edge);
+  // on touch it rests in view and fades only during a stroke.
+  let show;
+  if (ptr.down) show = false;
+  else if (TOUCH) show = true;
+  else show = ptr.cy > innerHeight - 140;
+  uiEl.classList.toggle('show', show);
+
+  if (ptr.type === 'touch' || ptr.down){ cursorEl.style.opacity = 0; return; }   // fade ring while drawing / under a finger
+  if (!ptr.inWindow){ cursorEl.style.opacity = 0; return; }
   cursorEl.style.opacity = 1;
   const tool = resolveActiveTool();
   const pr = ptr.down ? pressureNow() : 0.3;
@@ -88,13 +128,19 @@ export function initUI(){
 
   modeBtn.addEventListener('click', nextMode);
   menuBtn.addEventListener('click', () => setMenuOpen(!menuOpen()));
-  inkBtn.addEventListener('click', () => setInkWhite(!state.inkWhite));
 
-  /* --- ink hue picker (delete this block + the #cInk element for pure b&w) --- */
-  const cInk = document.getElementById('cInk');
-  cInk.value = getColorHex();
-  cInk.addEventListener('input', e => { applyInkHex(e.target.value); scheduleSave(); });
-  /* --- end ink hue picker --- */
+  /* build the ink swatch palette */
+  const swRoot = document.getElementById('swatches');
+  for (const s of INK_SWATCHES){
+    const b = document.createElement('button');
+    b.className = 'swatch' + (s.white ? ' swatch-white' : '');
+    if (s.white) b.dataset.white = '1';
+    else { b.dataset.hex = s.hex; b.style.background = s.hex; }
+    b.setAttribute('aria-label', 'Ink: ' + s.id);
+    b.addEventListener('click', () => selectSwatch(b));
+    swRoot.appendChild(b);
+    swatchEls.push(b);
+  }
 
   document.getElementById('bFix').addEventListener('click', () => { fixDrawing(); setMenuOpen(false); });
   document.getElementById('bClear').addEventListener('click', () => { clearAll(); setMenuOpen(false); });
@@ -116,4 +162,5 @@ export function initUI(){
   // reflect restored state into the controls
   setMode(state.uiMode);
   setInkWhite(state.inkWhite);
+  setMenuOpen(false);   // start calm: advanced controls tucked away
 }

@@ -1,12 +1,11 @@
 'use strict';
 
 import { canvas } from './gl.js';
-import { ptr, state, TOUCH } from './config.js';
+import { ptr, state } from './config.js';
 
 /* ---------------- input ---------------- */
 
 const hintEl = document.getElementById('hint');
-const uiEl = document.getElementById('ui');
 
 let activePointerId = null;
 
@@ -36,7 +35,6 @@ canvas.addEventListener('pointermove', e => {
   if (!ptr.down) ptr.type = e.pointerType;
   if (ptr.down) ptr.barrel = (e.buttons & 34) !== 0;
   readPressure(e);
-  if (!ptr.down && !TOUCH) uiEl.classList.toggle('show', e.clientY > innerHeight - 110);
 });
 function endStroke(e){
   if (e && e.pointerId !== undefined && e.pointerId !== activePointerId) return;
