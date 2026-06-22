@@ -1,10 +1,10 @@
 'use strict';
 
 import { splat, ink, wet } from '../sim.js';
-import { ptr, inkColor, sizeMult } from '../config.js';
+import { ptr, inkColor, penSizeMult } from '../config.js';
 
 function radius(pr, speed){
-  return (0.0016 + 0.0042 * pr) * Math.min(Math.max(1.12 - speed * 0.3, 0.55), 1.12) * sizeMult();
+  return (0.0016 + 0.0042 * pr) * Math.min(Math.max(1.12 - speed * 0.3, 0.55), 1.12) * penSizeMult();
 }
 
 /* pen: a fine nib laying near-dry ink that pools when it rests */

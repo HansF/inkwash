@@ -23,10 +23,9 @@ export function initNative(){
 
   const StatusBar = plugin('StatusBar');
   if (StatusBar){
-    // Android 15+ (edge-to-edge) ignores setBackgroundColor, so instead let the
-    // WebView draw under the status bar — the paper page background shows through.
-    // viewport-fit=cover + the safe-area insets in CSS keep content clear of it.
-    StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
+    // The Android theme paints the bars paper with dark icons (see styles.xml);
+    // keep the WebView inset below the status bar and reinforce the icon style.
+    StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
     StatusBar.setStyle({ style: 'LIGHT' }).catch(() => {});   // LIGHT = dark icons for light bg
   }
 

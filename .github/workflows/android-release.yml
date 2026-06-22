@@ -38,10 +38,9 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Assemble www/ and add the Android platform
+      - name: Assemble www/ and sync the Android platform
         run: |
           npm run build:www
-          npx cap add android
           npx cap sync android
 
       - name: Build release APK (unsigned)

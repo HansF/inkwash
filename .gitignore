@@ -4,8 +4,9 @@ node_modules/
 # generated Capacitor web bundle
 www/
 
-# generated native platform projects
-/android/
+# native platform projects: android/ is committed (it carries the themed status
+# bar + window background); ios/ stays generated. android/.gitignore excludes its
+# own build output and the copied web assets.
 /ios/
 
 # misc

@@ -40,10 +40,12 @@ export const ptr = {
 
 /* ---------------- pure helpers ---------------- */
 
-// brush scale from the size slider. Recalibrated smaller: the old 1/3x..3x range
-// made every brush huge at the top end (fude filled the screen). New range is
-// ~0.2x (min) .. 0.6x (max), so the slider's max ≈ the old ~25% feel.
-export function sizeMult(){ return 0.2 * Math.pow(3, P.SIZE); }
+// Brush scale from the size slider. The broad brushes (water/fude) use a small
+// range — the old 1/3x..3x made them huge at the top (fude filled the screen).
+export function sizeMult(){ return 0.2 * Math.pow(3, P.SIZE); }          // ~0.2x .. 0.6x
+// The pen is a fine nib and needs a larger range to stay legible, so it keeps
+// its own (wider) curve: 1/3x at min, 1x at the middle, 3x at max.
+export function penSizeMult(){ return Math.pow(3, (P.SIZE - 0.5) * 2); } // 1/3x .. 3x
 
 export function inkColor(dens){
   return state.inkWhite ? [0, 0, 0, dens]
